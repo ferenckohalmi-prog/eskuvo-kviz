@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+html<!DOCTYPE html>
 <html lang="hu">
 <head>
     <meta charset="UTF-8">
@@ -47,7 +47,6 @@
     <script type="module">
         import { createClient } from 'https://esm.sh';
 
-        // !!! NAGYON PONTOSAN CSERÉLD KI A SAJÁT ADATAIDRA !!!
         const SUPABASE_URL = "https://rmhzxapbtrxlybgnpggb.supabase.co";
         const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InJtaHp4YXBidHJ4bHliZ25wZ2diIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODUzOTYyNzgsImV4cCI6MjEwMDk3MjI3OH0.DJOdPNCdnJqMhkgYa5QnN3Xf_mEXiF6jmqT6bBO5PL4";
 
@@ -57,16 +56,9 @@
         async function initAndLoad() {
             const container = document.getElementById('quiz-container');
             
-            // 1. URL és Kulcs ellenőrzés
-            if (SUPABASE_URL.includes("MÁSOLD_IDE") || SUPABASE_ANON_KEY.includes("MÁSOLD_IDE")) {
-                container.innerHTML = `<div class="error-box"><b>⚠️ Hiba:</b> Elfelejtetted kicserélni a kód elején a SUPABASE_URL vagy SUPABASE_ANON_KEY szöveget a saját Supabase adataidra!</div>`;
-                return;
-            }
-
             try {
                 supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
                 
-                // 2. Adatlekérés tesztelése
                 const { data: questions, error } = await supabase
                     .from('questions')
                     .select('*')
@@ -76,12 +68,8 @@
                     container.innerHTML = `
 <div class="error-box">
 <b>❌ Kapcsolódási hiba az adatbázissal!</b>
-Úgy tűnik, a megadott URL vagy Kulcs nem megfelelő.
-
-<b>A Supabase hibaüzenete:</b>
 Üzenet: ${error.message}
 Kód: ${error.code || 'Nincs kód'}
-Részletek: ${error.details || 'Nincs részlet'}
 </div>`;
                     return;
                 }
@@ -91,11 +79,10 @@ Részletek: ${error.details || 'Nincs részlet'}
                     return;
                 }
 
-                // 3. Ha minden jó, kirajzoljuk a kérdéseket
                 renderQuestions(questions);
 
             } catch (err) {
-                container.innerHTML = `<div class="error-box"><b>💥 Váratlan rendszerhiba történt a böngészőben:</b>\n${err.stack || err.message}</div>`;
+                container.innerHTML = `<div class="error-box"><b>💥 Váratlan rendszerhiba történt a böngészőben:</b>\n${err.message}</div>`;
             }
         }
 
@@ -171,7 +158,6 @@ Részletek: ${error.details || 'Nincs részlet'}
             }
         });
 
-        // Indítás
         initAndLoad();
     </script>
 </body>
