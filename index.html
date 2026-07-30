@@ -1,0 +1,161 @@
+!DOCTYPE html>
+<html lang="hu">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Esküvői Kérdés Foglaló</title>
+    <style>
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: #f4f7f6; color: #333; max-width: 800px; margin: 0 auto; padding: 20px; }
+        h1 { text-align: center; color: #2c3e50; }
+        p.intro { text-align: center; color: #7f8c8d; margin-bottom: 30px; }
+        .category-title { background: #34495e; color: white; padding: 10px; border-radius: 5px; margin-top: 20px; }
+        .question-card { background: white; padding: 15px; margin: 10px 0; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); display: flex; justify-content: space-between; align-items: center; }
+        .question-text { font-weight: 600; font-size: 1.05em; }
+        .reserved { background: #e8ecef; color: #95a5a6; border-left: 5px solid #bdc3c7; }
+        .reserved .question-text { text-decoration: line-through; }
+        .status-tag { font-size: 0.85em; padding: 4px 8px; border-radius: 4px; font-weight: bold; }
+        .status-free { background: #2ecc71; color: white; }
+        .status-taken { background: #e74c3c; color: white; }
+        button { background: #3498db; color: white; border: none; padding: 8px 15px; border-radius: 4px; cursor: pointer; font-weight: bold; }
+        button:hover { background: #2980b9; }
+        .modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); justify-content: center; align-items: center; }
+        .modal-content { background: white; padding: 20px; border-radius: 8px; text-align: center; max-width: 400px; width: 90%; }
+        input { width: 80%; padding: 10px; margin: 15px 0; border: 1px solid #ccc; border-radius: 4px; text-align: center; }
+        .error-msg { background: #f8d7da; color: #721c24; padding: 15px; border-radius: 5px; border: 1px solid #f5c6cb; margin: 20px 0; font-weight: bold; }
+    </style>
+</head>
+<body>
+
+    <h1>💍 Esküvői Kérdésválasztó</h1>
+    <p class="intro">Válassz egy kérdést a listából! Ha lefoglalod, más már nem választhatja.</p>
+
+    <div id="quiz-container">Betöltés...</div>
+
+    <!-- Foglalási ablak (Modal) -->
+    <div id="bookingModal" class="modal">
+        <div class="modal-content">
+            <h3>Kérdés lefoglalása</h3>
+            <p id="modalQuestionText"></p>
+            <input type="text" id="userName" placeholder="Írd be a neved..." required>
+            <br>
+            <button id="confirmBtn">Lefoglalom</button>
+            <button id="cancelBtn" style="background:#95a5a6;">Mégse</button>
+        </div>
+    </div>
+
+    <!-- Modern modul alapú script betöltés -->
+    <script type="module">
+        import { createClient } from 'https://esm.sh';
+
+        // !!! CSERÉLD KI A SAJÁT ADATAIDRA !!!
+        const SUPABASE_URL = "https://rmhzxapbtrxlybgnpggb.supabase.co";
+        const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InJtaHp4YXBidHJ4bHliZ25wZ2diIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODUzOTYyNzgsImV4cCI6MjEwMDk3MjI3OH0.DJOdPNCdnJqMhkgYa5QnN3Xf_mEXiF6jmqT6bBO5PL4";
+
+        const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+        let selectedQuestionId = null;
+
+        async function loadQuestions() {
+            try {
+                const { data: questions, error } = await supabase
+                    .from('questions')
+                    .select('*')
+                    .order('id', { ascending: true });
+
+                if (error) {
+                    showError(`Adatbázis hiba: ${error.message}`);
+                    return;
+                }
+
+                if (!questions || questions.length === 0) {
+                    showError("A tábla üres. Ellenőrizd az SQL importálást a Supabase-ben!");
+                    return;
+                }
+
+                renderQuestions(questions);
+            } catch (err) {
+                showError(`Váratlan hiba történt: ${err.message}`);
+            }
+        }
+
+        function renderQuestions(questions) {
+            const categories = {};
+            questions.forEach(q => {
+                if (!categories[q.category]) categories[q.category] = [];
+                categories[q.category].push(q);
+            });
+
+            let html = "";
+            for (let cat in categories) {
+                html += `<h2 class="category-title">${cat}</h2>`;
+                categories[cat].forEach(q => {
+                    const isReserved = q.reserved_by !== null && q.reserved_by !== "";
+                    html += `
+                        <div class="question-card ${isReserved ? 'reserved' : ''}">
+                            <div>
+                                <div class="question-text">${q.question}</div>
+                                ${isReserved ? `<div style="font-size:0.85em; margin-top:5px;">🔒 Lefoglalta: <b>${q.reserved_by}</b></div>` : ''}
+                            </div>
+                            <div>
+                                ${isReserved 
+                                    ? `<span class="status-tag status-taken">Foglalt</span>` 
+                                    : `<button class="select-btn" data-id="${q.id}" data-text="${q.question.replace(/'/g, "\\'")}">Kiválasztom</button>`
+                                }
+                            </div>
+                        </div>
+                    `;
+                });
+            }
+            document.getElementById('quiz-container').innerHTML = html;
+
+            // Eseménykezelők hozzáadása a gombokhoz
+            document.querySelectorAll('.select-btn').forEach(btn => {
+                btn.addEventListener('click', (e) => {
+                    openModal(e.target.dataset.id, e.target.dataset.text);
+                });
+            });
+        }
+
+        function showError(msg) {
+            document.getElementById('quiz-container').innerHTML = `<div class="error-msg">${msg}</div>`;
+        }
+
+        function openModal(id, text) {
+            selectedQuestionId = id;
+            document.getElementById('modalQuestionText').innerText = text;
+            document.getElementById('bookingModal').style.display = 'flex';
+        }
+
+        function closeModal() {
+            document.getElementById('bookingModal').style.display = 'none';
+            document.getElementById('userName').value = "";
+        }
+
+        document.getElementById('cancelBtn').addEventListener('click', closeModal);
+
+        document.getElementById('confirmBtn').addEventListener('click', async () => {
+            const name = document.getElementById('userName').value.trim();
+            if (!name) {
+                alert("Kérlek, add meg a neved a foglaláshoz!");
+                return;
+            }
+
+            const { error } = await supabase
+                .from('questions')
+                .update({ reserved_by: name })
+                .eq('id', selectedQuestionId)
+                .is('reserved_by', null);
+
+            if (error) {
+                alert("Hiba történt a mentés során: " + error.message);
+            } else {
+                alert("Sikeresen lefoglaltad a kérdést!");
+                closeModal();
+                loadQuestions();
+            }
+        });
+
+        // Betöltés indítása
+        loadQuestions();
+    </script>
+</body>
+</html>
