@@ -21,7 +21,7 @@
         .modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); justify-content: center; align-items: center; }
         .modal-content { background: white; padding: 20px; border-radius: 8px; text-align: center; max-width: 400px; width: 90%; }
         input { width: 80%; padding: 10px; margin: 15px 0; border: 1px solid #ccc; border-radius: 4px; text-align: center; }
-        .error-msg { background: #f8d7da; color: #721c24; padding: 15px; border-radius: 5px; border: 1px solid #f5c6cb; margin: 20px 0; font-weight: bold; }
+        .error-box { background: #f8d7da; color: #721c24; padding: 20px; border-radius: 8px; border: 1px solid #f5c6cb; margin-top: 20px; font-family: monospace; font-size: 0.9em; white-space: pre-wrap; line-height: 1.5; }
     </style>
 </head>
 <body>
@@ -29,7 +29,7 @@
     <h1>💍 Esküvői Kérdésválasztó</h1>
     <p class="intro">Válassz egy kérdést a listából! Ha lefoglalod, más már nem választhatja.</p>
 
-    <div id="quiz-container">Betöltés...</div>
+    <div id="quiz-container">Betöltés a Supabase adatbázisból...</div>
 
     <!-- Foglalási ablak (Modal) -->
     <div id="bookingModal" class="modal">
@@ -47,33 +47,55 @@
     <script type="module">
         import { createClient } from 'https://esm.sh';
 
-        // !!! CSERÉLD KI A SAJÁT ADATAIDRA !!!
+        // !!! NAGYON PONTOSAN CSERÉLD KI A SAJÁT ADATAIDRA !!!
         const SUPABASE_URL = "https://rmhzxapbtrxlybgnpggb.supabase.co";
         const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InJtaHp4YXBidHJ4bHliZ25wZ2diIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODUzOTYyNzgsImV4cCI6MjEwMDk3MjI3OH0.DJOdPNCdnJqMhkgYa5QnN3Xf_mEXiF6jmqT6bBO5PL4";
 
-        const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+        let supabase;
         let selectedQuestionId = null;
 
-        async function loadQuestions() {
+        async function initAndLoad() {
+            const container = document.getElementById('quiz-container');
+            
+            // 1. URL és Kulcs ellenőrzés
+            if (SUPABASE_URL.includes("MÁSOLD_IDE") || SUPABASE_ANON_KEY.includes("MÁSOLD_IDE")) {
+                container.innerHTML = `<div class="error-box"><b>⚠️ Hiba:</b> Elfelejtetted kicserélni a kód elején a SUPABASE_URL vagy SUPABASE_ANON_KEY szöveget a saját Supabase adataidra!</div>`;
+                return;
+            }
+
             try {
+                supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+                
+                // 2. Adatlekérés tesztelése
                 const { data: questions, error } = await supabase
                     .from('questions')
                     .select('*')
                     .order('id', { ascending: true });
 
                 if (error) {
-                    showError(`Adatbázis hiba: ${error.message}`);
+                    container.innerHTML = `
+<div class="error-box">
+<b>❌ Kapcsolódási hiba az adatbázissal!</b>
+Úgy tűnik, a megadott URL vagy Kulcs nem megfelelő.
+
+<b>A Supabase hibaüzenete:</b>
+Üzenet: ${error.message}
+Kód: ${error.code || 'Nincs kód'}
+Részletek: ${error.details || 'Nincs részlet'}
+</div>`;
                     return;
                 }
 
                 if (!questions || questions.length === 0) {
-                    showError("A tábla üres. Ellenőrizd az SQL importálást a Supabase-ben!");
+                    container.innerHTML = `<div class="error-box"><b>⚠️ Figyelem:</b> A kapcsolat sikeres, de a 'questions' nevű tábla teljesen üres a Supabase-ben!</div>`;
                     return;
                 }
 
+                // 3. Ha minden jó, kirajzoljuk a kérdéseket
                 renderQuestions(questions);
+
             } catch (err) {
-                showError(`Váratlan hiba történt: ${err.message}`);
+                container.innerHTML = `<div class="error-box"><b>💥 Váratlan rendszerhiba történt a böngészőben:</b>\n${err.stack || err.message}</div>`;
             }
         }
 
@@ -107,16 +129,11 @@
             }
             document.getElementById('quiz-container').innerHTML = html;
 
-            // Eseménykezelők hozzáadása a gombokhoz
             document.querySelectorAll('.select-btn').forEach(btn => {
                 btn.addEventListener('click', (e) => {
                     openModal(e.target.dataset.id, e.target.dataset.text);
                 });
             });
-        }
-
-        function showError(msg) {
-            document.getElementById('quiz-container').innerHTML = `<div class="error-msg">${msg}</div>`;
         }
 
         function openModal(id, text) {
@@ -150,12 +167,12 @@
             } else {
                 alert("Sikeresen lefoglaltad a kérdést!");
                 closeModal();
-                loadQuestions();
+                initAndLoad();
             }
         });
 
-        // Betöltés indítása
-        loadQuestions();
+        // Indítás
+        initAndLoad();
     </script>
 </body>
 </html>
